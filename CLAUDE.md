@@ -30,32 +30,28 @@ go mod tidy
 ### Docker 部署
 
 ```bash
-# 启动开发环境（PostgreSQL + Redis + 后端 + 前端）
-docker-compose up -d
+# 单服务 compose，应用启动时自动等待依赖并创建数据库
+docker compose up -d --build
 
 # 查看服务日志
-docker-compose logs -f
+docker compose logs -f
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 重新构建
-docker-compose build --no-cache
-
-# 数据库备份
-docker-compose exec postgres pg_dump -U epay epay > backup.sql
-
-# 数据库恢复
-cat backup.sql | docker-compose exec -T postgres psql -U epay epay
+docker compose build --no-cache
 ```
+
+当前 `docker-compose.yml` 默认复用 new-api 的 PostgreSQL / Redis，不包含独立数据库容器。
 
 ### 访问地址
 
-- 前端: http://localhost
-- 后端 API: http://localhost:8080
-- 管理后台: http://localhost/admin/login
-- 商户中心: http://localhost/merchant/login
-- 健康检查: http://localhost:8080/health
+- Web（前端 + API）: http://localhost:3889（Docker 默认映射）
+- 管理后台: http://localhost:3889/admin/login
+- 商户中心: http://localhost:3889/merchant/login
+- 健康检查: http://localhost:3889/health
+- 本地开发（无 embed）: http://localhost:8080 仅 API；前端用 `make dev-frontend`
 
 ## 架构设计
 

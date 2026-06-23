@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	corepayment "github.com/example/epay-go/internal/payment"
 	"github.com/example/epay-go/internal/service"
 	"github.com/example/epay-go/pkg/response"
 	"github.com/example/epay-go/pkg/sign"
@@ -75,25 +76,23 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	// 创建订单
-	routing, err := resolvePayRouting(req.Type, c.DefaultQuery("pay_method", ""))
-	if err != nil {
-		response.ParamError(c, err.Error())
-		return
-	}
-
 	platformBaseURL := getPaymentBaseURL(c)
 	orderReq := &service.CreateOrderRequest{
-		MerchantID:      merchant.ID,
-		OutTradeNo:      req.OutTradeNo,
-		Amount:          amount,
-		Name:            req.Name,
-		PayType:         routing.PayType,
-		NotifyURL:       req.NotifyURL,
+		MerchantID:        merchant.ID,
+		OutTradeNo:        req.OutTradeNo,
+		Amount:            amount,
+		Name:              req.Name,
+		PayType:           req.Type,
+		NotifyURL:         req.NotifyURL,
 		MerchantNotifyURL: req.NotifyURL,
-		PlatformBaseURL: platformBaseURL,
-		ReturnURL:       req.ReturnURL,
-		ClientIP:        utils.GetClientIP(c),
-		PayMethod:       routing.PayMethod,
+		PlatformBaseURL:   platformBaseURL,
+		ReturnURL:         req.ReturnURL,
+		ClientIP:          utils.GetClientIP(c),
+		PayMethod:         c.DefaultQuery("pay_method", ""),
+	}
+	if err := orderReq.NormalizeRouting(corepayment.ResolveRouting); err != nil {
+		response.ParamError(c, err.Error())
+		return
 	}
 
 	orderResp, err := orderService.Create(context.Background(), orderReq)

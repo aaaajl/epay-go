@@ -1,18 +1,11 @@
-# epay-go 共享基础设施部署
-# 复用 new-api 的 postgres / redis，单服务运行（初始化由镜像 entrypoint 完成）
+# epay-go 发布部署（预构建镜像，复用 new-api 基础设施）
+# 由 scripts/package-docker.sh 复制到 release/
 
 name: epay-go
 
 services:
   backend:
     platform: ${DOCKER_PLATFORM:-linux/amd64}
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        BASE_IMAGE_REGISTRY: ${DOCKER_REGISTRY_MIRROR:-docker.m.daocloud.io/library}
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
-        GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
     image: epay-go:latest
     restart: unless-stopped
     env_file:

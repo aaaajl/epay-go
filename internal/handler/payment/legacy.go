@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	corepayment "github.com/example/epay-go/internal/payment"
 	"github.com/example/epay-go/internal/model"
 	"github.com/example/epay-go/internal/service"
 	"github.com/example/epay-go/pkg/sign"
@@ -331,24 +332,24 @@ func createLegacyOrder(c *gin.Context, req *LegacyCreateOrderRequest) (*service.
 		return nil, nil, fmt.Errorf("金额格式错误")
 	}
 
-	routing, err := resolvePayRouting(req.Type, req.PayMethod)
-	if err != nil {
+	orderReq := &service.CreateOrderRequest{
+		MerchantID:        merchant.ID,
+		OutTradeNo:        req.OutTradeNo,
+		Amount:            amount,
+		Name:              req.Name,
+		PayType:           req.Type,
+		NotifyURL:         req.NotifyURL,
+		MerchantNotifyURL: req.NotifyURL,
+		PlatformBaseURL:   getPaymentBaseURL(c),
+		ReturnURL:         req.ReturnURL,
+		ClientIP:          utils.GetClientIP(c),
+		PayMethod:         req.PayMethod,
+	}
+	if err := orderReq.NormalizeRouting(corepayment.ResolveRouting); err != nil {
 		return nil, nil, err
 	}
 
-	orderResp, err := orderService.Create(context.Background(), &service.CreateOrderRequest{
-		MerchantID:       merchant.ID,
-		OutTradeNo:       req.OutTradeNo,
-		Amount:           amount,
-		Name:             req.Name,
-		PayType:          routing.PayType,
-		NotifyURL:        req.NotifyURL,
-		MerchantNotifyURL: req.NotifyURL,
-		PlatformBaseURL:  getPaymentBaseURL(c),
-		ReturnURL:        req.ReturnURL,
-		ClientIP:         utils.GetClientIP(c),
-		PayMethod:        routing.PayMethod,
-	})
+	orderResp, err := orderService.Create(context.Background(), orderReq)
 	if err != nil {
 		return nil, nil, err
 	}

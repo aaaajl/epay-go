@@ -37,13 +37,19 @@ Thumbs.db
 # Build
 dist/
 build/
+release/
+release-*.tar.gz
 
 # Frontend
 web/node_modules/
 web/dist/
+internal/web/dist/
 
 # Config
 config.yaml
+
+# Payment credentials (certificates, private keys)
+auth/
 
 # Worktrees
 .worktrees/

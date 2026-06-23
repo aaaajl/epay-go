@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/example/epay-go/internal/middleware"
+	"github.com/example/epay-go/internal/payment"
 	"github.com/example/epay-go/internal/service"
 	"github.com/example/epay-go/pkg/response"
 	"github.com/example/epay-go/pkg/utils"
@@ -38,14 +39,18 @@ func TestPayment(c *gin.Context) {
 
 	outTradeNo := "MTEST" + utils.GenerateTradeNo()
 	orderReq := &service.CreateOrderRequest{
-		MerchantID:        merchantID,
-		OutTradeNo:        outTradeNo,
-		Amount:            amount,
-		Name:              "商户测试支付",
-		PayType:           req.PayType,
-		PlatformBaseURL:   baseURL,
-		ClientIP:          utils.GetClientIP(c),
-		PayMethod:         req.PayMethod,
+		MerchantID:      merchantID,
+		OutTradeNo:      outTradeNo,
+		Amount:          amount,
+		Name:            "商户测试支付",
+		PayType:         req.PayType,
+		PlatformBaseURL: baseURL,
+		ClientIP:        utils.GetClientIP(c),
+		PayMethod:       req.PayMethod,
+	}
+	if err := orderReq.NormalizeRouting(payment.ResolveRouting); err != nil {
+		response.ParamError(c, err.Error())
+		return
 	}
 
 	orderService := service.NewOrderService()

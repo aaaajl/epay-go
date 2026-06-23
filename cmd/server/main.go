@@ -17,6 +17,7 @@ import (
 	"github.com/example/epay-go/internal/middleware"
 	"github.com/example/epay-go/internal/router"
 	"github.com/example/epay-go/internal/service"
+	"github.com/example/epay-go/internal/web"
 	"github.com/gin-gonic/gin"
 
 	// 注册支付适配器
@@ -30,6 +31,12 @@ func main() {
 	}
 	cfg := config.Get()
 
+	ctx := context.Background()
+
+	if err := database.Prepare(ctx); err != nil {
+		log.Fatalf("Failed to prepare database: %v", err)
+	}
+
 	// 初始化数据库
 	if err := database.Init(); err != nil {
 		log.Fatalf("Failed to init database: %v", err)
@@ -42,8 +49,8 @@ func main() {
 	}
 
 	// 初始化 Redis
-	if err := cache.Init(); err != nil {
-		log.Fatalf("Failed to init redis: %v", err)
+	if err := cache.Prepare(ctx); err != nil {
+		log.Fatalf("Failed to prepare redis: %v", err)
 	}
 	defer cache.Close()
 
@@ -71,6 +78,9 @@ func main() {
 
 	// 注册所有路由
 	router.Setup(r)
+
+	// 嵌入式前端静态资源（-tags embed 构建时生效）
+	web.SetupStatic(r)
 
 	// 启动异步通知工作协程
 	ctx, cancel := context.WithCancel(context.Background())

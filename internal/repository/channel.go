@@ -6,6 +6,7 @@ import (
 
 	"github.com/example/epay-go/internal/database"
 	"github.com/example/epay-go/internal/model"
+	"github.com/example/epay-go/internal/payment"
 	"gorm.io/gorm"
 )
 
@@ -84,17 +85,30 @@ func (r *ChannelRepository) GetByPluginAndPayType(plugin, payType string) (*mode
 
 // GetAvailableByPayType 根据支付类型获取可用通道
 func (r *ChannelRepository) GetAvailableByPayType(payType string) (*model.Channel, error) {
+	return r.GetAvailable(payType, "")
+}
+
+// GetAvailable 根据支付类型和场景获取可用通道
+func (r *ChannelRepository) GetAvailable(payType, payMethod string) (*model.Channel, error) {
 	var channel model.Channel
 	normalizedPayType := strings.ToLower(strings.TrimSpace(payType))
+	normalizedMethod := strings.ToLower(strings.TrimSpace(payMethod))
 	query := r.db.Where("status = 1")
 
 	switch normalizedPayType {
 	case "wxpay", "wechat":
-		query = query.Where("plugin = ? OR pay_types LIKE ?", "wechat", "%"+normalizedPayType+"%")
-	case "alipay":
-		query = query.Where("plugin = ? OR pay_types LIKE ?", "alipay", "%"+normalizedPayType+"%")
+		query = query.Where("plugin = ?", "wechat")
+	case "alipay", "ali":
+		query = query.Where("plugin = ?", "alipay")
 	default:
-		query = query.Where("pay_types LIKE ?", "%"+normalizedPayType+"%")
+		query = query.Where("plugin = ? OR pay_types LIKE ?", normalizedPayType, "%"+normalizedPayType+"%")
+	}
+
+	if normalizedMethod != "" {
+		appTypeToken := payment.AppTypeToken(normalizedPayType, normalizedMethod)
+		if appTypeToken != "" {
+			query = query.Where("app_type LIKE ?", "%"+appTypeToken+"%")
+		}
 	}
 
 	err := query.Order("sort ASC").First(&channel).Error

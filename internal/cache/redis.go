@@ -33,6 +33,38 @@ func Init() error {
 	return nil
 }
 
+// Prepare waits for Redis to become available.
+func Prepare(ctx context.Context) error {
+	const maxAttempts = 60
+	const retryDelay = 2 * time.Second
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if err := Init(); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			if RDB != nil {
+				_ = RDB.Close()
+				RDB = nil
+			}
+			log.Printf("Waiting for redis (attempt %d/%d): %v", attempt, maxAttempts, err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+		}
+	}
+
+	return fmt.Errorf("redis not ready after %d attempts: %w", maxAttempts, lastErr)
+}
+
 func Get() *redis.Client {
 	return RDB
 }

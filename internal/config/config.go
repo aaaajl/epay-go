@@ -56,6 +56,7 @@ func Load(path string) error {
 	viper.BindEnv("redis.host", "REDIS_HOST")
 	viper.BindEnv("redis.port", "REDIS_PORT")
 	viper.BindEnv("redis.password", "REDIS_PASSWORD")
+	viper.BindEnv("redis.db", "REDIS_DB")
 	viper.BindEnv("jwt.secret", "JWT_SECRET")
 	viper.BindEnv("server.mode", "GIN_MODE")
 

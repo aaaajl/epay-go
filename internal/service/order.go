@@ -34,18 +34,31 @@ func NewOrderService() *OrderService {
 
 // CreateOrderRequest 创建订单请求
 type CreateOrderRequest struct {
-	MerchantID  int64             `json:"-"`
-	OutTradeNo  string            `json:"out_trade_no" binding:"required"`
-	Amount      decimal.Decimal   `json:"money" binding:"required"`
-	Name        string            `json:"name" binding:"required"`
-	PayType     string            `json:"type" binding:"required"` // alipay, wxpay
-	NotifyURL   string            `json:"notify_url" binding:"omitempty,url"`
-	MerchantNotifyURL string      `json:"-"`
-	PlatformBaseURL  string       `json:"-"`
-	ReturnURL   string            `json:"return_url" binding:"omitempty,url"`
-	ClientIP    string            `json:"-"`
-	PayMethod   string            `json:"pay_method"` // scan, h5, jsapi, web
-	Extra       map[string]string `json:"extra"`
+	MerchantID        int64             `json:"-"`
+	OutTradeNo        string            `json:"out_trade_no" binding:"required"`
+	Amount            decimal.Decimal   `json:"money" binding:"required"`
+	Name              string            `json:"name" binding:"required"`
+	PayType           string            `json:"type" binding:"required"` // alipay, wxpay 或 WX_NATIVE 等别名
+	NotifyURL         string            `json:"notify_url" binding:"omitempty,url"`
+	MerchantNotifyURL string            `json:"-"`
+	PlatformBaseURL   string            `json:"-"`
+	ReturnURL         string            `json:"return_url" binding:"omitempty,url"`
+	ClientIP          string            `json:"-"`
+	PayMethod         string            `json:"pay_method"` // scan, h5, jsapi, web, native
+	Extra             map[string]string `json:"extra"`
+}
+
+type routingResolver func(rawType, rawPayMethod string) (*payment.ResolvedRouting, error)
+
+// NormalizeRouting 归一化支付类型与场景（支持 WX_NATIVE 等别名）
+func (req *CreateOrderRequest) NormalizeRouting(resolver routingResolver) error {
+	routing, err := resolver(req.PayType, req.PayMethod)
+	if err != nil {
+		return err
+	}
+	req.PayType = routing.PayType
+	req.PayMethod = routing.PayMethod
+	return nil
 }
 
 // CreateOrderResponse 创建订单响应
@@ -65,9 +78,9 @@ func (s *OrderService) Create(ctx context.Context, req *CreateOrderRequest) (*Cr
 	}
 
 	// 获取可用通道
-	channel, err := s.channelRepo.GetAvailableByPayType(req.PayType)
+	channel, err := s.channelRepo.GetAvailable(req.PayType, req.PayMethod)
 	if err != nil {
-		return nil, errors.New("暂无可用的支付通道")
+		return nil, errors.New("暂无可用的支付通道，请先在管理后台配置并启用对应的微信支付通道")
 	}
 
 	// 创建支付适配器
@@ -109,7 +122,10 @@ func (s *OrderService) Create(ctx context.Context, req *CreateOrderRequest) (*Cr
 	// 调用支付接口
 	payMethod := req.PayMethod
 	if payMethod == "" {
-		payMethod = "scan" // 默认扫码
+		payMethod = payment.ResolvePayMethod(req.PayType)
+	}
+	if payMethod == "" {
+		payMethod = "scan"
 	}
 
 	providerNotifyURL := req.NotifyURL
@@ -269,6 +285,7 @@ func (s *OrderService) CreateTestOrder(channelID int64, amount, payType, platfor
 
 	// 调用支付接口
 	providerNotifyURL := strings.TrimRight(platformBaseURL, "/") + "/api/pay/notify/" + channel.Plugin
+	payMethod := payment.ResolvePayMethod(payType)
 	payReq := &payment.CreateOrderRequest{
 		TradeNo:   tradeNo,
 		Amount:    amountDecimal,
@@ -276,7 +293,7 @@ func (s *OrderService) CreateTestOrder(channelID int64, amount, payType, platfor
 		ClientIP:  "127.0.0.1",
 		NotifyURL: providerNotifyURL,
 		ReturnURL: "",
-		PayMethod: payType,
+		PayMethod: payMethod,
 		Extra:     nil,
 	}
 
