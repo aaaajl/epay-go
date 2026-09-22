@@ -1,0 +1,58 @@
+# epay-go 部署 compose（预构建镜像，复用 new-api 的网络访问 Redis）
+# 推荐：
+#   cp .env.example .env
+#   ./deploy.sh local          # 本机
+#   ./deploy.sh prod           # 推到生产机并以 prod 模式重启
+#
+# DB_HOST / REDIS_HOST 由 start.sh 按 local|prod 写成字面量覆盖。
+
+name: epay-go
+
+services:
+  backend:
+    image: ${IMAGE:-epay-go:local}
+    container_name: epay-go
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-epay}
+      DB_SSLMODE: disable
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: ${REDIS_DB:-1}
+      JWT_SECRET: ${JWT_SECRET}
+      GIN_MODE: release
+      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-root}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
+    ports:
+      - "${HTTP_PORT:-3889}:8080"
+    volumes:
+      - ./logs:/app/logs
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - mkdir -p /app/logs && exec ./epay-server >> /app/logs/epay-go-$$(date +%Y%m%d%H%M%S).log 2>&1
+    networks:
+      - shared-infra
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  shared-infra:
+    external: true
+    name: ${SHARED_NETWORK:-new-api_new-api-network}
